@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -35,6 +36,13 @@ const navItems = [
 
 export function DashboardNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const signOut = useMutation(api.auth.signOut);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/');
+  };
 
   return (
     <div className="border-b">
@@ -58,7 +66,7 @@ export function DashboardNav() {
             </Link>
           ))}
         </nav>
-        <Button variant="ghost" onClick={() => signOut({ callbackUrl: '/' })}>
+        <Button variant="ghost" onClick={handleSignOut}>
           Log out
         </Button>
       </div>
