@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signIn } = useAuthActions();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -25,22 +27,16 @@ export default function SignupPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      await signIn("password", {
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        flow: "signUp"
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
-      }
-
-      // Redirect to login page after successful registration
-      router.push('/login?registered=true');
+      // Redirect to dashboard after successful registration
+      router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -111,7 +107,7 @@ export default function SignupPage() {
                 minLength={8}
               />
               <p className="text-xs text-muted-foreground">
-                Must include uppercase, lowercase, number, and special character
+                Must be at least 8 characters
               </p>
             </div>
 
