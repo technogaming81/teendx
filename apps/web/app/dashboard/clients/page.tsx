@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Id } from '@/convex/_generated/dataModel';
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+
+export const dynamic = 'force-dynamic';
 
 export default function ClientsPage() {
   const clients = useQuery(api.clients.list);
