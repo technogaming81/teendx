@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ApiClient } from '@/lib/api-client';
-import type { Client } from '@teendx/shared-types';
+import type { Id } from '@/convex/_generated/dataModel';
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
+  const clients = useQuery(api.clients.list);
+  const createClient = useMutation(api.clients.create);
+  const updateClient = useMutation(api.clients.update);
+  const deleteClient = useMutation(api.clients.remove);
+
   const [showForm, setShowForm] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editingClientId, setEditingClientId] = useState<Id<"clients"> | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,44 +25,30 @@ export default function ClientsPage() {
     notes: '',
   });
 
-  useEffect(() => {
-    loadClients();
-  }, []);
-
-  const loadClients = async () => {
-    try {
-      setLoading(true);
-      const data = await ApiClient.getClients();
-      setClients(data as Client[]);
-    } catch (error) {
-      console.error('Failed to load clients:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      if (editingClient) {
-        await ApiClient.updateClient(editingClient.id, formData);
+      if (editingClientId) {
+        await updateClient({
+          id: editingClientId,
+          ...formData,
+        });
       } else {
-        await ApiClient.createClient(formData);
+        await createClient(formData);
       }
 
       setShowForm(false);
       setFormData({ name: '', email: '', phone: '', company: '', notes: '' });
-      setEditingClient(null);
-      loadClients();
+      setEditingClientId(null);
     } catch (error) {
       console.error('Failed to save client:', error);
       alert('Failed to save client');
     }
   };
 
-  const handleEdit = (client: Client) => {
-    setEditingClient(client);
+  const handleEdit = (client: any) => {
+    setEditingClientId(client._id);
     setFormData({
       name: client.name,
       email: client.email || '',
@@ -69,12 +59,11 @@ export default function ClientsPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: Id<"clients">) => {
     if (!confirm('Are you sure you want to delete this client?')) return;
 
     try {
-      await ApiClient.deleteClient(id);
-      loadClients();
+      await deleteClient({ id });
     } catch (error) {
       console.error('Failed to delete client:', error);
       alert('Failed to delete client');
@@ -88,7 +77,7 @@ export default function ClientsPage() {
     }));
   };
 
-  if (loading) {
+  if (clients === undefined) {
     return <div className="text-center py-10">Loading clients...</div>;
   }
 
@@ -101,7 +90,7 @@ export default function ClientsPage() {
         </div>
         <Button onClick={() => {
           setShowForm(!showForm);
-          setEditingClient(null);
+          setEditingClientId(null);
           setFormData({ name: '', email: '', phone: '', company: '', notes: '' });
         }}>
           {showForm ? 'Cancel' : 'Add Client'}
@@ -111,9 +100,9 @@ export default function ClientsPage() {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>{editingClient ? 'Edit Client' : 'New Client'}</CardTitle>
+            <CardTitle>{editingClientId ? 'Edit Client' : 'New Client'}</CardTitle>
             <CardDescription>
-              {editingClient ? 'Update client information' : 'Add a new client to your portfolio'}
+              {editingClientId ? 'Update client information' : 'Add a new client to your portfolio'}
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
@@ -176,7 +165,7 @@ export default function ClientsPage() {
             </CardContent>
             <CardFooter>
               <Button type="submit">
-                {editingClient ? 'Update Client' : 'Add Client'}
+                {editingClientId ? 'Update Client' : 'Add Client'}
               </Button>
             </CardFooter>
           </form>
@@ -192,7 +181,7 @@ export default function ClientsPage() {
           </Card>
         ) : (
           clients.map((client) => (
-            <Card key={client.id}>
+            <Card key={client._id}>
               <CardHeader>
                 <CardTitle>{client.name}</CardTitle>
                 {client.company && (
@@ -214,7 +203,10 @@ export default function ClientsPage() {
                 )}
                 <div className="text-sm">
                   <span className="text-muted-foreground">LTV: </span>
-                  ₹{Number(client.lifetimeValue).toLocaleString('en-IN')}
+                  ₹{client.lifetimeValue.toLocaleString('en-IN')}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {client._count.invoices} invoices · {client._count.projects} projects
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
@@ -224,7 +216,7 @@ export default function ClientsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => handleDelete(client.id)}
+                  onClick={() => handleDelete(client._id)}
                 >
                   Delete
                 </Button>
