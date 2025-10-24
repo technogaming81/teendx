@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useAuthActions } from "@convex-dev/auth/react";
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -37,7 +36,7 @@ const navItems = [
 export function DashboardNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const signOut = useMutation(api.auth.signOut);
+  const { signOut } = useAuthActions();
 
   const handleSignOut = async () => {
     await signOut();
