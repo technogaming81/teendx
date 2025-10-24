@@ -255,7 +255,7 @@ export default defineSchema({
     xpEarned: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_time", ["userId", "_creationTime"]),
+    .index("by_user_and_activity", ["userId", "activityType"]),
 
   // Community: Posts
   communityPosts: defineTable({
@@ -269,8 +269,7 @@ export default defineSchema({
     mediaUrls: v.array(v.string()),
   })
     .index("by_channel", ["channel"])
-    .index("by_user", ["userId"])
-    .index("by_channel_and_time", ["channel", "_creationTime"]),
+    .index("by_user", ["userId"]),
 
   // Community: Comments
   communityComments: defineTable({
