@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { prisma } from '@teendx/database';
+import clientRoutes from './routes/clients';
 
 // Load environment variables
 dotenv.config();
@@ -29,13 +30,11 @@ app.get('/api', (req, res) => {
   res.json({ message: 'Teendx API v1.0.0' });
 });
 
-// Import routes (to be added)
-// import authRoutes from './routes/auth';
-// import clientRoutes from './routes/clients';
+// API routes
+app.use('/api/clients', clientRoutes);
+// TODO: Add more routes
 // import invoiceRoutes from './routes/invoices';
 // import expenseRoutes from './routes/expenses';
-// app.use('/api/auth', authRoutes);
-// app.use('/api/clients', clientRoutes);
 // app.use('/api/invoices', invoiceRoutes);
 // app.use('/api/expenses', expenseRoutes);
 
