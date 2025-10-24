@@ -3,8 +3,12 @@ const nextConfig = {
   transpilePackages: ['@teendx/shared-types'],
   reactStrictMode: true,
   poweredByHeader: false,
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
+  },
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
   },
   images: {
     remotePatterns: [
