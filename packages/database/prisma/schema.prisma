@@ -1,0 +1,637 @@
+// Teendx Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  phone            String?   @unique
+  hashedPassword   String?
+  name             String
+  avatarUrl        String?
+  dateOfBirth      DateTime?
+
+  // Gamification
+  level            Int       @default(1)
+  xp               Int       @default(0)
+  currentStreak    Int       @default(0)
+  longestStreak    Int       @default(0)
+  lastActivityDate DateTime?
+
+  // Subscription
+  subscriptionTier String    @default("free") // free, pro
+  subscriptionEnds DateTime?
+
+  // Business Settings
+  businessName     String?
+  businessLogo     String?
+  gstNumber        String?
+  panNumber        String?
+
+  // Preferences
+  theme            String    @default("light")
+  language         String    @default("en")
+  compactMode      Boolean   @default(false)
+
+  // 2FA
+  twoFactorEnabled Boolean   @default(false)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  clients            Client[]
+  invoices           Invoice[]
+  expenses           Expense[]
+  projects           Project[]
+  badges             UserBadge[]
+  goals              Goal[]
+  communityPosts     CommunityPost[]
+  communityComments  CommunityComment[]
+  messagesSent       Message[]             @relation("SentMessages")
+  referrals          Referral[]
+  notifications      Notification[]
+  activityLogs       ActivityLog[]
+  challengeCompletions UserChallengeCompletion[]
+  communityLikes     CommunityLike[]
+
+  @@index([email])
+}
+
+model RecoveryCode {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String   @unique
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============================================
+// CLIENT MANAGEMENT
+// ============================================
+
+model Client {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name              String
+  email             String?
+  phone             String?
+  company           String?
+  gstNumber         String?
+
+  // Address
+  address           String?
+  city              String?
+  state             String?
+  pincode           String?
+  country           String    @default("India")
+
+  // Business Data
+  notes             String?
+  tags              String[]  @default([])
+  healthScore       Int?      // 1-100, AI-generated
+  acquisitionSource String?   // referral, social, direct, etc.
+
+  // Financials
+  totalPaid         Decimal   @default(0) @db.Decimal(10, 2)
+  totalDue          Decimal   @default(0) @db.Decimal(10, 2)
+  lifetimeValue     Decimal   @default(0) @db.Decimal(10, 2)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastContactDate   DateTime?
+
+  // Relations
+  invoices          Invoice[]
+  projects          Project[]
+  communications    ClientCommunication[]
+
+  @@index([userId])
+}
+
+model ClientCommunication {
+  id        String   @id @default(uuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  type      String   // email, call, meeting, message
+  summary   String?
+
+  date      DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+// ============================================
+// INVOICE & PAYMENT
+// ============================================
+
+model Invoice {
+  id                String    @id @default(uuid())
+  invoiceNumber     String    @unique
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId          String
+  client            Client    @relation(fields: [clientId], references: [id])
+
+  // Invoice Details
+  status            String    @default("draft") // draft, sent, paid, partially_paid, overdue, cancelled
+  amount            Decimal   @db.Decimal(10, 2)
+  taxAmount         Decimal   @default(0) @db.Decimal(10, 2)
+  totalAmount       Decimal   @db.Decimal(10, 2)
+  currency          String    @default("INR")
+
+  // Dates
+  issueDate         DateTime
+  dueDate           DateTime
+  paidDate          DateTime?
+
+  // Payment
+  paymentMethod     String?   // UPI, Bank Transfer, Cash, etc.
+  paymentLinkId     String?   @unique
+  paymentQRCode     String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+
+  // Content
+  description       String?
+  notes             String?
+  terms             String?
+
+  // Files
+  pdfUrl            String?
+
+  // Tracking
+  sentAt            DateTime?
+  viewedAt          DateTime?
+  remindersSent     Int       @default(0)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  items             InvoiceItem[]
+  payments          Payment[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Int      @default(1)
+  rate        Decimal  @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
+
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id             String    @id @default(uuid())
+  invoiceId      String
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id])
+
+  amount         Decimal   @db.Decimal(10, 2)
+  paymentMethod  String    // UPI, Card, Net Banking, Cash
+  paymentGateway String?   // razorpay, paytm, phonepe
+  transactionId  String?
+
+  status         String    @default("pending") // pending, success, failed
+  paidAt         DateTime?
+
+  notes          String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([invoiceId])
+}
+
+// ============================================
+// EXPENSE MANAGEMENT
+// ============================================
+
+model Expense {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount          Decimal  @db.Decimal(10, 2)
+  category        String   // Software, Travel, Marketing, Equipment, etc.
+  description     String
+
+  date            DateTime
+  paymentMethod   String?
+
+  // Receipt
+  receiptUrl      String?
+
+  // Tax
+  isTaxDeductible Boolean  @default(true)
+
+  tags            String[] @default([])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+// ============================================
+// PROJECT MANAGEMENT
+// ============================================
+
+model Project {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId        String?
+  client          Client?   @relation(fields: [clientId], references: [id])
+
+  name            String
+  description     String?
+  status          String    @default("active") // active, completed, cancelled
+
+  // Pricing
+  estimatedValue  Decimal?  @db.Decimal(10, 2)
+  actualValue     Decimal?  @db.Decimal(10, 2)
+
+  // Timeline
+  startDate       DateTime?
+  endDate         DateTime?
+  completedAt     DateTime?
+
+  // Progress
+  progressPercent Int       @default(0)
+
+  // Hours tracking
+  estimatedHours  Int?
+  actualHours     Int?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  milestones      Milestone[]
+  timeEntries     TimeEntry[]
+
+  @@index([userId])
+  @@index([clientId])
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+model TimeEntry {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  description String?
+  hours       Decimal  @db.Decimal(5, 2)
+  date        DateTime
+
+  createdAt   DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// ============================================
+// GAMIFICATION
+// ============================================
+
+model Badge {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String
+  iconUrl     String
+  category    String      // milestone, achievement, streak, community
+  xpReward    Int         @default(0)
+
+  // Unlock criteria (stored as JSON for flexibility)
+  criteria    Json
+
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId    String
+  badge      Badge    @relation(fields: [badgeId], references: [id])
+
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+}
+
+model Goal {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type         String    // income, clients, projects, savings
+  targetValue  Decimal   @db.Decimal(10, 2)
+  currentValue Decimal   @default(0) @db.Decimal(10, 2)
+
+  period       String    // weekly, monthly, quarterly, yearly
+  startDate    DateTime
+  endDate      DateTime
+
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model DailyChallenge {
+  id          String    @id @default(uuid())
+
+  title       String
+  description String
+  xpReward    Int
+
+  // Challenge criteria
+  type        String    // send_invoices, add_clients, log_expense, etc.
+  target      Int       // e.g., 3 invoices
+
+  date        DateTime  @db.Date
+
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  completions UserChallengeCompletion[]
+
+  @@unique([type, date])
+}
+
+model UserChallengeCompletion {
+  id          String         @id @default(uuid())
+  userId      String
+  challengeId String
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id])
+
+  completedAt DateTime       @default(now())
+
+  @@unique([userId, challengeId])
+  @@index([userId])
+}
+
+model ActivityLog {
+  id           String   @id @default(uuid())
+  userId       String
+
+  activityType String   // invoice_created, client_added, goal_updated, etc.
+  metadata     Json?
+
+  xpEarned     Int      @default(0)
+
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ============================================
+// COMMUNITY
+// ============================================
+
+model CommunityPost {
+  id            String             @id @default(uuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content       String
+  channel       String             // wins, questions, collaborate, tips
+
+  // Engagement
+  likesCount    Int                @default(0)
+  commentsCount Int                @default(0)
+
+  // Moderation
+  isAnonymous   Boolean            @default(false)
+  status        String             @default("published") // published, flagged, removed
+
+  // Media
+  mediaUrls     String[]           @default([])
+
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  // Relations
+  comments      CommunityComment[]
+  likes         CommunityLike[]
+
+  @@index([userId])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+model CommunityComment {
+  id        String        @id @default(uuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content   String
+
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([postId])
+  @@index([userId])
+}
+
+model CommunityLike {
+  id        String        @id @default(uuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime      @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model Message {
+  id         String    @id @default(uuid())
+  senderId   String
+  sender     User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+
+  content    String
+
+  read       Boolean   @default(false)
+  readAt     DateTime?
+
+  createdAt  DateTime  @default(now())
+
+  @@index([senderId, receiverId])
+}
+
+model UserProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+
+  // Portfolio
+  slug           String   @unique // for teendx.in/username
+  bio            String?
+  tagline        String?
+
+  // Services
+  services       String[] @default([])
+  rateCard       Json?    // {service: rate} mapping
+
+  // Social links
+  instagramUrl   String?
+  linkedinUrl    String?
+  portfolioUrl   String?
+
+  // Settings
+  isPublic       Boolean  @default(false)
+  acceptingWork  Boolean  @default(true)
+
+  // Stats (public-facing)
+  totalProjects  Int      @default(0)
+  totalEarnings  Decimal  @default(0) @db.Decimal(10, 2)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model Referral {
+  id              String    @id @default(uuid())
+  referrerId      String
+  referrer        User      @relation(fields: [referrerId], references: [id])
+
+  referredEmail   String
+  referredUserId  String?
+
+  status          String    @default("pending") // pending, signed_up, converted
+
+  rewardGiven     Boolean   @default(false)
+  rewardType      String?   // free_month, cash, etc.
+
+  createdAt       DateTime  @default(now())
+  convertedAt     DateTime?
+
+  @@index([referrerId])
+}
+
+// ============================================
+// AI & ANALYTICS
+// ============================================
+
+model PricingSuggestion {
+  id              String   @id @default(uuid())
+
+  serviceType     String
+  location        String
+  experienceLevel String
+
+  minPrice        Decimal  @db.Decimal(10, 2)
+  maxPrice        Decimal  @db.Decimal(10, 2)
+  confidence      Decimal  @db.Decimal(3, 2) // 0.00 to 1.00
+
+  dataPoints      Int      // number of data points used
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([serviceType, location])
+}
+
+model TaxEstimate {
+  id             String   @id @default(uuid())
+  userId         String
+
+  financialYear  String   // "2023-24"
+  quarter        String?  // Q1, Q2, Q3, Q4
+
+  totalIncome    Decimal  @db.Decimal(10, 2)
+  totalExpenses  Decimal  @db.Decimal(10, 2)
+  taxableIncome  Decimal  @db.Decimal(10, 2)
+
+  estimatedTax   Decimal  @db.Decimal(10, 2)
+  tdsDeducted    Decimal  @default(0) @db.Decimal(10, 2)
+
+  calculatedAt   DateTime @default(now())
+
+  @@unique([userId, financialYear, quarter])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String    // payment_received, invoice_overdue, goal_achieved, etc.
+  title     String
+  message   String
+
+  read      Boolean   @default(false)
+  readAt    DateTime?
+
+  // Action link
+  actionUrl String?
+
+  createdAt DateTime  @default(now())
+
+  @@index([userId, read])
+}
