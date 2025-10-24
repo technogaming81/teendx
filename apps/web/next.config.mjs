@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@teendx/database', '@teendx/shared-types'],
+  transpilePackages: ['@teendx/shared-types'],
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
@@ -12,6 +12,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.convex.cloud',
       },
     ],
   },
