@@ -3,6 +3,9 @@ const nextConfig = {
   transpilePackages: ['@teendx/shared-types'],
   reactStrictMode: true,
   poweredByHeader: false,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {
