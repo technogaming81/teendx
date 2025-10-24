@@ -1,71 +1,22 @@
-import { auth } from '@/auth';
-import { prisma } from '@teendx/database';
+"use client";
+
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default async function DashboardPage() {
-  const session = await auth();
+export default function DashboardPage() {
+  const stats = useQuery(api.users.dashboardStats);
 
-  if (!session?.user?.id) {
-    return null;
+  if (!stats) {
+    return <div className="text-center py-10">Loading...</div>;
   }
 
-  // Fetch user stats
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: {
-      _count: {
-        select: {
-          clients: true,
-          invoices: true,
-          expenses: true,
-          projects: true,
-        },
-      },
-    },
-  });
-
-  // Fetch total income (paid invoices)
-  const paidInvoices = await prisma.invoice.aggregate({
-    where: {
-      userId: session.user.id,
-      status: 'paid',
-    },
-    _sum: {
-      totalAmount: true,
-    },
-  });
-
-  // Fetch total expenses
-  const totalExpenses = await prisma.expense.aggregate({
-    where: {
-      userId: session.user.id,
-    },
-    _sum: {
-      amount: true,
-    },
-  });
-
-  // Fetch pending invoices
-  const pendingInvoices = await prisma.invoice.aggregate({
-    where: {
-      userId: session.user.id,
-      status: {
-        in: ['sent', 'overdue'],
-      },
-    },
-    _sum: {
-      totalAmount: true,
-    },
-  });
-
-  const totalIncome = Number(paidInvoices._sum.totalAmount || 0);
-  const totalExpense = Number(totalExpenses._sum.amount || 0);
-  const pendingAmount = Number(pendingInvoices._sum.totalAmount || 0);
+  const { user, counts, financials } = stats;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
+        <h1 className="text-3xl font-bold">Welcome back, {user.name}!</h1>
         <p className="text-muted-foreground">Here's what's happening with your business</p>
       </div>
 
@@ -87,7 +38,7 @@ export default async function DashboardPage() {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalIncome.toLocaleString('en-IN')}</div>
+            <div className="text-2xl font-bold">₹{financials.totalIncome.toLocaleString('en-IN')}</div>
             <p className="text-xs text-muted-foreground">From paid invoices</p>
           </CardContent>
         </Card>
@@ -111,7 +62,7 @@ export default async function DashboardPage() {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{pendingAmount.toLocaleString('en-IN')}</div>
+            <div className="text-2xl font-bold">₹{financials.pendingAmount.toLocaleString('en-IN')}</div>
             <p className="text-xs text-muted-foreground">Awaiting payment</p>
           </CardContent>
         </Card>
@@ -134,7 +85,7 @@ export default async function DashboardPage() {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalExpense.toLocaleString('en-IN')}</div>
+            <div className="text-2xl font-bold">₹{financials.totalExpenses.toLocaleString('en-IN')}</div>
             <p className="text-xs text-muted-foreground">Total business expenses</p>
           </CardContent>
         </Card>
@@ -158,7 +109,7 @@ export default async function DashboardPage() {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?._count.clients || 0}</div>
+            <div className="text-2xl font-bold">{counts.clients}</div>
             <p className="text-xs text-muted-foreground">Active clients</p>
           </CardContent>
         </Card>
@@ -172,15 +123,15 @@ export default async function DashboardPage() {
           <CardContent className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm">Level</span>
-              <span className="text-2xl font-bold">{user?.level}</span>
+              <span className="text-2xl font-bold">{user.level}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">XP</span>
-              <span className="text-xl font-semibold">{user?.xp}</span>
+              <span className="text-xl font-semibold">{user.xp}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">Current Streak</span>
-              <span className="text-xl font-semibold">{user?.currentStreak} days</span>
+              <span className="text-xl font-semibold">{user.currentStreak} days</span>
             </div>
           </CardContent>
         </Card>
@@ -192,15 +143,15 @@ export default async function DashboardPage() {
           <CardContent className="space-y-2">
             <div className="flex justify-between">
               <span className="text-sm">Invoices</span>
-              <span className="font-semibold">{user?._count.invoices}</span>
+              <span className="font-semibold">{counts.invoices}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm">Projects</span>
-              <span className="font-semibold">{user?._count.projects}</span>
+              <span className="font-semibold">{counts.projects}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm">Expenses Logged</span>
-              <span className="font-semibold">{user?._count.expenses}</span>
+              <span className="font-semibold">{counts.expenses}</span>
             </div>
           </CardContent>
         </Card>
